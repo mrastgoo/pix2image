@@ -196,10 +196,8 @@ namespace POLPro
             }
         // Convert to uint16
         
-            //BOOST_LOG_TRIVIAL(debug) << "The min and maximum of the converted image : \n "  ;
             for (int i = 0; i < img.size(); ++i){
                 img[i].convertTo(img[i], CV_16U);
-                // BOOST_LOG_TRIVIAL(debug) << minmax(img[i], "Img" + std::to_string(i));
             }
    
         }
@@ -231,7 +229,6 @@ namespace POLPro
                 // we need to shift the image next to each other properly
                 int offset_col = i % 2;
                 int offset_row = i / 2;
-		//BOOST_LOG_TRIVIAL(debug) << minmax(img[i], "origin"+ std::to_string(i)); 
                
                 img[i].copyTo(output_img(
                                   cv::Rect(img_size.width * offset_col,
@@ -345,44 +342,3 @@ int main(int argc, char  *argv[]) {
 
 
 
-/* // reading the files using boost library.
-
-    path apk_path(dirName);                                        
-
-    recursive_directory_iterator end;   
-    int count=0; 
-    for (recursive_directory_iterator itr(apk_path); itr != end; ++itr){
-        const path cp = (*itr);                                     
-        std::cout<< cp.string() << std::endl;
-        std::cout<< cp.
-        count +=1; 
-    }                                                           
-*/
-
-
-/* 
-    // Readaing the files using dir and opendir 
-
-    std:: string dirName = argv[1];
-    DIR *dir;
-    dir = opendir(dirName.c_str());
-    std::string imgName;
-    struct dirent *ent;
-    int count = 0; 
-    if (dir != NULL) {
-        while ((ent = readdir (dir)) != NULL) {
-            imgName= ent->d_name;
-            std::string imgPath(dirName + ent->d_name);
-            std::cout<< "image name:" << imgName.length() << std::endl; 
-            //imgName = imgName.erase(10);
-            std::cout<< "image name:" << imgName << std::endl; 
-            //Img = cv::imread(imgPath); 
-            count +=1 ; 
-        }
-        closedir (dir); 
-    } else {
-        std::cout<<"not present"<<std::endl;
-    }
-
-    std::cout<< "Number of fils:" << count << std::endl; 
-*/
