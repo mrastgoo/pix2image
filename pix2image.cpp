@@ -3,7 +3,7 @@
 #include <pix2image.h>
 #include <boost/log/trivial.hpp>
 #include <boost/scoped_ptr.hpp>
-
+#include <boost/filesystem.hpp>
 //#include <photonfocus_camera.h>
 
 
@@ -136,6 +136,41 @@ namespace POLPro
     }
 
 
+    std::vector<cv::Mat> polar_stokes_preprocessing(std::vector<cv::Mat> img, 
+                                                   const bool is_stokes=true){
+
+        // Convert the data if Stokes or polarization parameters
+        if (is_stokes) {
+            // Stokes parameters normalization
+            img[0] /= 2.0;
+            img[1] = (img[1] + (cv::pow(2, 16)-1)) / 2.0;
+            img[2] = (img[2] + (cv::pow(2, 16)-1)) / 2.0;
+
+            BOOST_LOG_TRIVIAL(debug) << "The min and maximum of the converted image : \n "  ;
+            for (int i = 0; i < img.size(); ++i){
+                img[i].convertTo(img[i], CV_16U);
+                BOOST_LOG_TRIVIAL(debug) << minmax(img[i], "Img" + std::to_string(i));
+            }
+
+        } else {
+            // polarization parameters normalization
+            img[0] = img[0] * (cv::pow(2, 16) -1);
+            //angle is between 0 and 180 to show it in the CV_16U we just applify it by the maxVal/2
+            img[1] = img[1]; //+ (cv::pow(2, 10) -1);
+            img[2] = img[2] / 2;
+            img[0].convertTo(img[0], CV_16U); 
+            img[1].convertTo(img[1], CV_8U); 
+            img[2].convertTo(img[2], CV_16U); 
+
+            
+        }
+        // Convert to uint16
+        
+            
+   
+        return img; 
+    }
+
     void imshow(std::vector<cv::Mat> img, const bool as_hsv=false,
                 const bool is_stokes=true) {
 
@@ -144,29 +179,31 @@ namespace POLPro
             throw std::invalid_argument("img needs to be a 3 channels images"
                                         " if you need hsv support");
        
-        // Convert the data if Stokes or polarization parameters
-        if (img.size() == 3) {
+        // Preprocessing img 
+        if (img.size() ==3){
+             // Convert the data if Stokes or polarization parameters
             if (is_stokes) {
                 // Stokes parameters normalization
                 img[0] /= 2.0;
                 img[1] = (img[1] + (cv::pow(2, 16)-1)) / 2.0;
-		img[2] = (img[2] + (cv::pow(2, 16)-1)) / 2.0;
+                img[2] = (img[2] + (cv::pow(2, 16)-1)) / 2.0;
             } else {
                 // polarization parameters normalization
-	      img[0] = img[0] * (cv::pow(2, 16) -1);
-	      //angle is between 0 and 180 to show it in the CV_16U we just applify it by the maxVal/2
-	      img[1] = img[1] + (cv::pow(2, 10) -1);
-	      img[2] = img[2] / 2;
+                img[0] = img[0] * (cv::pow(2, 16) -1);
+                //angle is between 0 and 180 to show it in the CV_16U we just applify it by the maxVal/2
+                img[1] = img[1]; // +(cv::pow(2, 10) -1);
+                img[2] = img[2] / 2;
             }
-            // Convert to uint16
-
-	    BOOST_LOG_TRIVIAL(debug) << "The min and maximum of the converted image : \n "  ;
-	    for (int i = 0; i < img.size(); ++i){
+        // Convert to uint16
+        
+            //BOOST_LOG_TRIVIAL(debug) << "The min and maximum of the converted image : \n "  ;
+            for (int i = 0; i < img.size(); ++i){
                 img[i].convertTo(img[i], CV_16U);
-		BOOST_LOG_TRIVIAL(debug) << minmax(img[i], "Img" + std::to_string(i));
+                // BOOST_LOG_TRIVIAL(debug) << minmax(img[i], "Img" + std::to_string(i));
             }
-            
+   
         }
+
         // Declare the output image
         cv::Mat output_img;
 
@@ -194,7 +231,7 @@ namespace POLPro
                 // we need to shift the image next to each other properly
                 int offset_col = i % 2;
                 int offset_row = i / 2;
-		BOOST_LOG_TRIVIAL(debug) << minmax(img[i], "origin"+ std::to_string(i)); 
+		//BOOST_LOG_TRIVIAL(debug) << minmax(img[i], "origin"+ std::to_string(i)); 
                
                 img[i].copyTo(output_img(
                                   cv::Rect(img_size.width * offset_col,
@@ -208,49 +245,144 @@ namespace POLPro
         cv::imshow("Output image", output_img);
     }
 
-    // void imsave(std::vector<cv::Mat> img, const std::string& s) {
-    //     for (int i = 0; i < img.size(); ++i){
-    //         cv::imwrite("A_" + std::to_string(i) + "_" + s, img[i]);
-    //     }
-    // }
+    void imsave(std::vector<cv::Mat> img, const std::string& s,
+                const std::string method,
+                const std::string PathtoSave){
+        
+        if(method == "stokes"){
+            for (int i = 0; i < img.size(); ++i){
+                cv::imwrite(PathtoSave+"S"+ std::to_string(i) + "_" + s, img[i]);
+            }
+
+        }else if(method == "polar"){
+            for (int i = 0; i < img.size()-1; ++i){
+                if (i == 0){
+                    cv::imwrite(PathtoSave+ "DoP" + "_" + s, img[i]);
+                }else{
+                    cv::imwrite(PathtoSave+ "AoP" + "_" + s, img[i]);
+                }
+            }
+        }else{
+            int list[] = {0, 45, 135, 90}; 
+            for (int i = 0; i < img.size(); ++i){
+                
+                cv::imwrite(PathtoSave+"I"+ std::to_string(list[i]) + "_" + s, img[i]);
+            }            
+ 
+        }
+        
+    }
 
 }  // Namespace POLPro
 
 
 
+using namespace boost::filesystem;       
 
+int main(int argc, char  *argv[]) {   
 
-int main(int argc, char** argv) {
-    if (argc != 2) {
-        std::cout <<" Usage: display_image ImageToLoadAndDisplay" << std::endl;
+    if (argc < 2) {
+        std::cout <<" Usage: pix2image method['angle', 'stokes', 'polar'] PathtoLoad PathtoSave" << std::endl;
         return -1;
     }
 
-    cv::Mat image = cv::imread(argv[1], CV_LOAD_IMAGE_GRAYSCALE);
 
-    if (!image.data) {
-        std::cout <<  "Could not open or find the image" << std::endl;
-        return -1;
-    }
-
-    // parsed image from original std
-    std::vector<cv::Mat> angle_image = POLPro::raw2mat(image, false);
+    std::string method = argv[1]; 
+    std::string LoadDir = argv[2];
+    std::string SaveDir = argv[3]; 
+    std::cout << "method --> " << method << std::endl; 
+    std::cout << "LoadDir--> " << LoadDir << std::endl; 
+    std::cout << "SaveDir --> " << SaveDir << std::endl; 
+        
+    // Loadin the images from a directory 
+    std::vector<cv::String> fn;
+    cv::glob(LoadDir, fn, false); 
     
-    //POLPro::imsave(angle_image, "pixelated.tiff");
-     
-    // // Stokes parameters
-    // std::vector<cv::Mat> stokes_images = POLPro::compute_stokes(angle_image, 
-                                                                 // false);
+    std::vector<cv::Mat> images;
+    std::size_t count = fn.size(); //number of png files in images folder
+    
+    int count2 = 0; 
+    
+    for (size_t i=0; i<count; i++){
+        std::cout<< "" << fn[i] << std::endl;
+        //images.push_back(cv::imread(fn[i]));
+        cv::Mat image = cv::imread(fn[i], CV_LOAD_IMAGE_UNCHANGED);
+        // parsed image from original std
+        std::vector<cv::Mat> output_img;
+        if (method == "stokes"){
+           // Stokes parameters
+            output_img = POLPro::compute_stokes(image, false);
+            output_img = POLPro::polar_stokes_preprocessing(output_img); 
 
-    // // polar components
-    // std::vector<cv::Mat> polar_images =
-    //     POLPro::compute_polar_params(stokes_images, true);
+        }else if (method == "polar"){
+            output_img = POLPro::compute_polar_params(image, false);
+            output_img = POLPro::polar_stokes_preprocessing(output_img, false); 
+         
+        }else if (method == "angle"){
+            // angle image 
+            output_img = POLPro::raw2mat(image, false);
+            
+        }else{
+            std::cout<< "The method is not reconizable" << std::endl; 
+            return -1; 
+        }
 
-    POLPro::imshow(angle_image);
-    // POLPro::imshow(stokes_images); 
-    //POLPro::imshow(polar_images, false, false); 
+        std::string name; 
+        name = std::to_string(i) + ".tiff"; 
+        POLPro::imsave(output_img, name, method, SaveDir);
+        POLPro::imshow(output_img, false, true);
+        cv::waitKey(0);
+        count2 +=1; 
+    }
+    
+    std::cout<< "Number of fils:" << count2 << std::endl; 
+    
 
-    cv::waitKey(0);
-
-   return 0;
+    return 0;                                    
 }
+
+
+
+
+
+/* // reading the files using boost library.
+
+    path apk_path(dirName);                                        
+
+    recursive_directory_iterator end;   
+    int count=0; 
+    for (recursive_directory_iterator itr(apk_path); itr != end; ++itr){
+        const path cp = (*itr);                                     
+        std::cout<< cp.string() << std::endl;
+        std::cout<< cp.
+        count +=1; 
+    }                                                           
+*/
+
+
+/* 
+    // Readaing the files using dir and opendir 
+
+    std:: string dirName = argv[1];
+    DIR *dir;
+    dir = opendir(dirName.c_str());
+    std::string imgName;
+    struct dirent *ent;
+    int count = 0; 
+    if (dir != NULL) {
+        while ((ent = readdir (dir)) != NULL) {
+            imgName= ent->d_name;
+            std::string imgPath(dirName + ent->d_name);
+            std::cout<< "image name:" << imgName.length() << std::endl; 
+            //imgName = imgName.erase(10);
+            std::cout<< "image name:" << imgName << std::endl; 
+            //Img = cv::imread(imgPath); 
+            count +=1 ; 
+        }
+        closedir (dir); 
+    } else {
+        std::cout<<"not present"<<std::endl;
+    }
+
+    std::cout<< "Number of fils:" << count << std::endl; 
+*/
